@@ -1,0 +1,4 @@
+#!/bin/bash
+trusted_domain="{{ vip }}"
+php /var/www/html/occ config:system:set trusted_domains 1 --value=$trusted_domain
+

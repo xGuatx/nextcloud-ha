@@ -1,0 +1,140 @@
+- hosts: galera
+  become: yes
+  tasks:
+
+    - name: Unmask MariaDB service
+      command: systemctl unmask mariadb
+
+    - name: Configure MariaDB for Galera
+      template:
+        src: templates/60-galera.cnf.j2
+        dest: /etc/mysql/mariadb.conf.d/60-galera.cnf
+
+    - name: Configure MariaDB for SSL and general settings
+      template:
+        src: templates/50-server.cnf.j2
+        dest: /etc/mysql/mariadb.conf.d/50-server.cnf
+
+    - name: Configure MariaDB for SSL client
+      template:
+        src: templates/50-client.cnf.j2
+        dest: /etc/mysql/mariadb.conf.d/50-client.cnf
+
+    - name: Create SSL directory on the server
+      file:
+        path: /etc/mysql/ssl
+        state: directory
+        mode: '0755'
+
+    - name: Copy CA certificate to the server
+      copy:
+        src: bddssl/ca-cert.pem
+        dest: /etc/mysql/ssl/ca-cert.pem
+        mode: '0644'
+
+    - name: Copy server certificate to the server
+      copy:
+        src: bddssl/server-cert.pem
+        dest: /etc/mysql/ssl/server-cert.pem
+        mode: '0644'
+
+    - name: Copy server key to the server
+      copy:
+        src: bddssl/server-key.pem
+        dest: /etc/mysql/ssl/server-key.pem
+        mode: '0600'
+
+    - name: Copy client certificate to the server
+      copy:
+        src: bddssl/client-cert.pem
+        dest: /etc/mysql/ssl/client-cert.pem
+        mode: '0644'
+
+    - name: Copy server key to the server
+      copy:
+        src: bddssl/client-key.pem
+        dest: /etc/mysql/ssl/client-key.pem
+        mode: '0600'
+
+
+    - name: Set ownership of the SSL directory and files to mysql
+      file:
+        path: "{{ item }}"
+        owner: mysql
+        group: mysql
+      with_items:
+        - /etc/mysql/ssl
+        - /etc/mysql/ssl/ca-cert.pem
+        - /etc/mysql/ssl/server-cert.pem
+        - /etc/mysql/ssl/server-key.pem
+        - /etc/mysql/ssl/client-cert.pem
+        - /etc/mysql/ssl/client-key.pem
+    
+    - name: Pause pendant 30 secondes
+      pause:
+        seconds: 30
+
+
+    - name: Bootstrap Galera cluster on the first node
+      shell: |
+        systemctl stop mariadb.service
+        galera_new_cluster || (journalctl -u mariadb -n 50)
+      when: inventory_hostname == "server1"
+
+- hosts: galera:!server1
+  become: yes
+  tasks:
+    - name: Enable Mariadb on others nodes
+      service:
+        name: mariadb
+        state: started
+        enabled: yes
+      register: mariadb_start
+      until: mariadb_start is succeeded
+      retries: 5
+      delay: 10
+
+- hosts: server1
+  become: yes
+  tasks:
+    - name: Create Nextcloud database
+      mysql_db:
+        name: "{{ nextcloud_db }}"
+        state: present
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create Nextcloud database user
+      mysql_user:
+        name: "{{ nextcloud_user }}"
+        password: "{{ nextcloud_db_password }}"
+        priv: '{{ nextcloud_db }}.*:ALL'
+        state: present
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Grant all privileges to nextcloud_user from any IP
+      mysql_user:
+        name: "{{ nextcloud_user }}"
+        password: "{{ nextcloud_db_password }}"
+        host: '%'
+        priv: '{{ nextcloud_db }}.*:ALL'
+        state: present
+        login_user: root
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+- hosts: galera
+  become: yes
+  tasks:
+    - name: Ensure MariaDB is started
+      service:
+        name: mariadb
+        state: started
+        enabled: true
+
+- hosts: galera:!server1
+  become: yes
+  tasks:
+    - name: Restart mariadb for synchronization
+      shell: systemctl restart mariadb
+

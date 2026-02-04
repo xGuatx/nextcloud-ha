@@ -1,0 +1,85 @@
+- hosts: glusterfs
+  become: yes
+  tasks:
+    - name: Install software-properties-common
+      shell: apt-get install -y software-properties-common
+
+    - name: Ajouter le dépôt GlusterFS PPA et mettre à jour le cache APT
+      shell: |
+        add-apt-repository ppa:gluster/glusterfs-9 -y
+        apt-get update
+
+    - name: Install GlusterFS server
+      shell: apt-get install -y glusterfs-server
+
+    - name: Ensure /data directory exists
+      file:
+        path: /data
+        state: directory
+        mode: '0755'
+
+    - name: Ensure /data/gv0 directory exists
+      file:
+        path: /data/gv0
+        state: directory
+        mode: '0755'
+
+    - name: Ensure /mnt/gv0 directory exists on all servers
+      file:
+        path: /mnt/gv0
+        state: directory
+        mode: '0755'
+
+    - name: Start and enable GlusterFS service
+      service:
+        name: glusterd
+        state: started
+        enabled: true
+
+- hosts: server1
+  become: yes
+  tasks:
+    - name: Gather IP addresses of cluster nodes
+      set_fact:
+        ip_server1: "{{ hostvars['server1']['ansible_default_ipv4']['address'] }}"
+        ip_server2: "{{ hostvars['server2']['ansible_default_ipv4']['address'] }}"
+        ip_server3: "{{ hostvars['server3']['ansible_default_ipv4']['address'] }}"
+
+    - name: Probe server2 and server3 to join GlusterFS cluster
+      shell: |
+        gluster peer probe {{ ip_server2 }}
+        gluster peer probe {{ ip_server3 }}
+      register: probe_result
+      changed_when: "'peer probe: success' in probe_result.stdout"
+
+    - name: Create GlusterFS volume
+      shell: |
+        gluster volume create gv0 replica 3 transport tcp {{ ip_server1 }}:/data/gv0 {{ ip_server2 }}:/data/gv0 {{ ip_server3 }}:/data/gv0 force
+      args:
+        creates: /var/lib/glusterd/vols/gv0
+
+    - name: Start GlusterFS volume
+      shell: gluster volume start gv0
+
+- hosts: glusterfs
+  become: yes
+  tasks:
+    - name: Mount GlusterFS volume on all servers using virtual IP
+      shell: mount -t glusterfs {{ vip }}:/gv0 /mnt/gv0
+
+    - name: Set correct permissions for GlusterFS volume
+      command: chmod -R 775 /mnt/gv0
+
+    - name: Verify replication by creating a test file (only on server1)
+      when: inventory_hostname == 'server1'
+      shell: echo "Test de réplication GlusterFS" | tee /mnt/gv0/test_replication.txt
+
+    - name: Check the existence of the test file on each node
+      shell: cat /mnt/gv0/test_replication.txt
+      register: check_replication
+      changed_when: false
+
+    - name: Display replication check results
+      debug:
+        var: check_replication.stdout_lines
+

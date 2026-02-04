@@ -1,0 +1,38 @@
+- hosts: glusterfs
+  become: yes
+  tasks:
+    - name: Stop GlusterFS service
+      service:
+        name: glusterd
+        state: stopped
+      ignore_errors: yes
+
+    - name: Ensure previous mount point is unmounted if corrupted (server1 only)
+      shell: umount -l /mnt/gv0
+      ignore_errors: yes
+
+    - name: Remove /mnt/gv0 if it exists and is corrupted (server1 only)
+      file:
+        path: /mnt/gv0
+        state: absent
+      ignore_errors: yes
+
+    - name: Uninstall GlusterFS
+      shell: |
+        add-apt-repository ppa:gluster/glusterfs-9 -y --remove
+        apt-get update -y 
+        apt purge glusterfs-server -y
+        apt autoremove -y
+        apt autoclean 
+
+    - name: Remove GlusterFS directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/glusterd
+        - /etc/glusterfs
+        - /var/log/glusterfs
+        - /data/gv0
+        - /mnt/gv0
+      ignore_errors: yes

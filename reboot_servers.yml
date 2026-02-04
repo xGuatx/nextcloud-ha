@@ -1,0 +1,9 @@
+---
+- name: Redémarrer les serveurs
+  hosts: all
+  become: yes
+  tasks:
+    - name: Redémarrer les serveurs
+      reboot:
+        reboot_timeout: 300
+

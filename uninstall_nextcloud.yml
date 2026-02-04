@@ -1,0 +1,33 @@
+- hosts: docker
+  become: yes
+  tasks:
+
+    - name: Remove Nextcloud stack from Docker Swarm
+      shell: docker stack rm nextcloud_stack
+      when: inventory_hostname == 'server1'
+      ignore_errors: yes
+
+    - name: Remove Nextcloud network from Docker Swarm
+      shell: docker network rm nextcloud_stack_nextcloud_net
+      when: inventory_hostname == 'server1'
+      ignore_errors: yes
+
+        #- name : remove file mount
+        #shell: rm -rf /mnt/gv0/* 
+        #ignore_errors: yes
+
+    - name: Remove file config
+      file: 
+        path: "{{ item }}"
+        state: absent
+      loop: 
+        - /root/init.sh
+        - /root/get_nextcloud_node.sh
+        - /root/docker-compose.yml
+        - /root/get_container_id.sh
+      ignore_errors: yes
+
+    - name: Remove Nextcloud volumes
+      shell: docker volume rm nextcloud_stack_glusterfs_volume
+      when: inventory_hostname == 'server1'
+      ignore_errors: yes

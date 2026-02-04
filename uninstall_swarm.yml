@@ -1,0 +1,26 @@
+- hosts: docker
+  become: yes
+  tasks:
+
+    - name: Stop and remove all Docker containers
+      shell: |
+        if [ "$(docker ps -aq)" ]; then
+          docker rm -f $(docker ps -aq)
+        else
+          echo "No containers to remove"
+        fi
+      ignore_errors: yes
+
+
+    - name: Remove all Docker networks (non-default)
+      shell: docker network prune -f
+      ignore_errors: yes
+
+    - name: Remove all Docker volumes (non-default)
+      shell: docker volume prune -f
+      ignore_errors: yes    
+
+    - name: Leave the Docker Swarm (workers and managers)
+      shell: docker swarm leave --force
+      ignore_errors: yes
+

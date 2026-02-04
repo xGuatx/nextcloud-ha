@@ -1,0 +1,23 @@
+- hosts: keepalived
+  become: yes
+  tasks:
+    - name: Stop Keepalived service
+      service:
+        name: keepalived
+        state: stopped
+
+    - name: Disable Keepalived service
+      service:
+        name: keepalived
+        enabled: no
+
+    - name: Uninstall Keepalived
+      apt:
+        name: keepalived
+        state: absent
+
+    - name: Remove Keepalived configuration file
+      file:
+        path: /etc/keepalived/keepalived.conf
+        state: absent
+

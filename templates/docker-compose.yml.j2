@@ -1,0 +1,22 @@
+version: '3.8'
+services:
+
+  nextcloud:
+    image: nextcloud:{{ nextcloud_version }}
+    ports:
+      - "8080:80"
+    environment:
+      - MYSQL_HOST={{ vip }}
+      - MYSQL_DATABASE={{ nextcloud_db }}
+      - MYSQL_USER={{ nextcloud_user }}
+      - MYSQL_PASSWORD={{ nextcloud_db_password }}
+    volumes:
+      - /mnt/gv0/nextcloud:/var/www/html
+    networks:
+      - nextcloud_net
+
+networks:
+  nextcloud_net:
+    driver: overlay
+
+

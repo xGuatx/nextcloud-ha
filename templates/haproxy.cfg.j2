@@ -1,0 +1,13 @@
+frontend nextcloud_front
+    bind *:80
+    mode http
+    default_backend nextcloud_back
+
+backend nextcloud_back
+    mode http
+    balance roundrobin
+    option httpchk HEAD / HTTP/1.1\r\nHost:localhost
+    server server1 {{ hostvars['server1'].ansible_host }}:8080 check
+    server server2 {{ hostvars['server2'].ansible_host }}:8080 check
+    server server3 {{ hostvars['server3'].ansible_host }}:8080 check
+

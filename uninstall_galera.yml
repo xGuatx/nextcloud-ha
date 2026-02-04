@@ -1,0 +1,24 @@
+- hosts: galera
+  become: yes
+  tasks:
+    - name: Stop MariaDB service
+      service:
+        name: mariadb
+        state: stopped
+      ignore_errors: yes
+
+    - name: Uninstall MariaDB Galera
+      apt:
+        name: mariadb-server,galera-3,galera-4
+        state: absent
+      ignore_errors: yes
+
+    - name: Remove MariaDB directories
+      file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/mysql
+        - /var/lib/mysql
+        - /var/log/mysql
+      ignore_errors: yes

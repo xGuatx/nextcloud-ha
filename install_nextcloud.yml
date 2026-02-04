@@ -1,0 +1,97 @@
+- hosts: docker
+  become: yes
+  tasks:
+
+    - name: Copy docker-compose.yml to the first manager
+      template:
+        src: templates/docker-compose.yml.j2
+        dest: /root/docker-compose.yml
+      when: inventory_hostname == groups['docker'][0]
+
+    - name: Copy get_nextcloud_node.sh
+      copy:
+        src: templates/get_nextcloud_node.sh
+        dest: /root/get_nextcloud_node.sh
+        mode: '0755'
+      when: inventory_hostname == groups['docker'][0]
+
+    - name: Deploy stack to Docker Swarm
+      shell: docker stack deploy -c /root/docker-compose.yml nextcloud_stack
+      when: inventory_hostname == groups['docker'][0]
+
+    - name: Récupérer le nœud où le service Nextcloud est en cours d'exécution
+      shell: bash /root/get_nextcloud_node.sh
+      register: running_node_info
+      retries: 10
+      delay: 10
+      until: running_node_info.stdout is search("Le service Nextcloud est en cours d'exécution")
+      when: inventory_hostname == groups['docker'][0]
+    
+    - name: Afficher le nœud en cours d'exécution
+      debug:
+        var: running_node_info.stdout
+      when: inventory_hostname == groups['docker'][0]
+
+    - name: Extraire le nom du nœud en cours d'exécution
+      set_fact:
+        nextcloud_running_node: "{{ running_node_info.stdout.split(':')[1].strip() }}"
+      when: inventory_hostname == groups['docker'][0]
+      delegate_facts: true
+
+    - name: Mapper node1 vers server1 si nécessaire
+      set_fact:
+        nextcloud_running_node: "{{ 'server1' if nextcloud_running_node == 'node1' else nextcloud_running_node }}"
+      when: inventory_hostname == groups['docker'][0]
+      delegate_facts: true
+
+    - name: Propager la variable nextcloud_running_node aux autres hôtes
+      add_host:
+        name: "{{ item }}"
+        nextcloud_running_node: "{{ nextcloud_running_node }}"
+      with_items: "{{ groups['docker'] }}"
+
+    - name: Copy get_container_id.sh to the node where Nextcloud is running
+      template:
+        src: templates/get_container_id.sh
+        dest: /root/get_container_id.sh
+      when: inventory_hostname == nextcloud_running_node
+      ignore_errors: yes
+
+    - name: Récupérer l'ID complet du conteneur Nextcloud sur le nœud en cours d'exécution
+      shell: bash /root/get_container_id.sh
+      register: container_info
+      when: inventory_hostname == nextcloud_running_node
+      ignore_errors: yes
+
+    - name: Afficher l'ID du conteneur
+      debug:
+        var: container_info.stdout
+      when: inventory_hostname == nextcloud_running_node
+
+    - name: Copy init.sh to the node where Nextcloud is running
+      template:
+        src: templates/init.sh.j2
+        dest: /root/init.sh
+      when: inventory_hostname == nextcloud_running_node
+      ignore_errors: yes
+
+    - name: Pause pendant 30 secondes
+      pause:
+        seconds: 30
+
+    - name: Copier le script init.sh dans le conteneur
+      command: docker cp /root/init.sh {{ container_info.stdout }}:/usr/local/bin/init.sh
+      when: container_info.stdout is defined and container_info.stdout != ""
+
+    - name: Ajouter les permissions d'exécution au script init.sh dans le conteneur
+      command: docker exec {{ container_info.stdout }} chmod +x /usr/local/bin/init.sh
+      when: container_info.stdout is defined and container_info.stdout != ""
+
+    - name: Exécuter le script init.sh dans le conteneur
+      command: docker exec {{ container_info.stdout }} /bin/bash /usr/local/bin/init.sh
+      when: container_info.stdout is defined and container_info.stdout != ""
+
+    - name: Supprimer le script après exécution
+      command: docker exec {{ container_info.stdout }} rm -f /usr/local/bin/init.sh
+      when: container_info.stdout is defined and container_info.stdout != ""
+

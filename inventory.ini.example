@@ -1,0 +1,59 @@
+# Ansible Inventory for Nextcloud HA Cluster
+# Copy to inventory.ini and configure with your values
+
+[all:vars]
+# Ansible sudo password file (create with ansible-vault)
+ansible_become_pass_file=sudo_pass.txt
+
+# Virtual IP for high availability (Keepalived VIP)
+vip=192.168.1.100
+
+# Database passwords - CHANGE THESE!
+galera_root_password=your_secure_galera_root_password
+nextcloud_db_password=your_secure_nextcloud_db_password
+
+# Nextcloud database configuration
+nextcloud_db=nextcloud_db
+nextcloud_user=nextcloud_user
+nextcloud_version=24.0.1
+
+# Server nodes - Configure your server IPs
+[all]
+server1 ansible_host=192.168.1.101 ansible_user=your_ansible_user
+server2 ansible_host=192.168.1.102 ansible_user=your_ansible_user
+server3 ansible_host=192.168.1.103 ansible_user=your_ansible_user
+
+[k3s_servers]
+server1
+server2
+server3
+
+[k3s_agents]
+server1
+server2
+server3
+
+[galera]
+server1
+server2
+server3
+
+[docker]
+server1
+server2
+server3
+
+[glusterfs]
+server1
+server2
+server3
+
+[haproxy]
+server1
+server2
+server3
+
+[keepalived]
+server1
+server2
+server3

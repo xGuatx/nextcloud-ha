@@ -1,0 +1,22 @@
+- hosts: keepalived
+  become: yes
+  tasks:
+    - name: Install Keepalived
+      apt:
+        name: keepalived
+        state: present
+
+    - name: Configure Keepalived
+      template:
+        src: templates/keepalived.conf.j2
+        dest: /etc/keepalived/keepalived.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Start and enable Keepalived service
+      service:
+        name: keepalived
+        state: started
+        enabled: true
+

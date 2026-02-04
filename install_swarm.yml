@@ -1,0 +1,19 @@
+- hosts: docker
+  become: yes
+  tasks:
+    - name: Initialize Docker Swarm on the first manager
+      shell: docker swarm init --advertise-addr {{ ansible_host }}
+      when: inventory_hostname == groups['docker'][0]
+      register: swarm_init
+
+    - name: Get the join token for manager nodes
+      shell: docker swarm join-token manager -q
+      when: inventory_hostname == groups['docker'][0]
+      register: manager_token
+      delegate_to: "{{ groups['docker'][0] }}"
+      run_once: true
+
+    - name: Join other managers to the swarm
+      shell: docker swarm join --token {{ manager_token.stdout }} {{ hostvars[groups['docker'][0]]['ansible_host'] }}:2377
+      when: inventory_hostname != groups['docker'][0]
+

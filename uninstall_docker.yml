@@ -1,0 +1,38 @@
+- hosts: docker
+  become: yes
+  tasks:
+    - name: Remove Docker related packages
+      apt:
+        name:
+          - docker.io
+          - docker-doc
+          - docker-compose
+          - docker-compose-v2
+          - podman-docker
+          - containerd
+          - runc
+        state: absent
+        purge: yes
+
+    - name: Purge Docker CE and related packages
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+          - docker-ce-rootless-extras
+        state: absent
+        purge: yes
+
+    - name: Remove Docker directory
+      file:
+        path: /var/lib/docker
+        state: absent
+
+    - name: Remove Containerd directory
+      file:
+        path: /var/lib/containerd
+        state: absent
+

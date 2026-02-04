@@ -1,0 +1,53 @@
+- hosts: galera
+  become: yes
+  tasks:
+
+    - name: Exécuter un dist-upgrade
+      apt:
+        upgrade: dist
+        force_apt_get: yes
+
+    - name: Supprimer les paquets inutilisés
+      apt:
+        autoremove: yes
+
+    - name: Corriger les problèmes de dépendances
+      command: apt-get -f install
+
+    - name: Purge existing MariaDB packages
+      apt:
+        name:
+          - mariadb-server
+          - galera-3
+          - galera-4
+        state: absent
+        purge: yes
+        autoremove: yes
+
+    - name: Install required dependencies
+      apt:
+        name:
+          - rsync
+          - netcat
+          - python3-pymysql
+        state: present
+
+    - name: Update APT cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+
+    - name: Install MariaDB server
+      shell: apt-get install -y mariadb-server
+
+    - name: Install Galera
+      shell:  apt-get install -y galera-4
+
+    - name: Mettre à jour le fichier /etc/hosts
+      lineinfile:
+        path: /etc/hosts
+        line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"
+      with_items: "{{ groups['galera'] }}"
+      when: inventory_hostname != item
+

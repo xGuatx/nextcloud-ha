@@ -1,0 +1,29 @@
+- hosts: galera
+  become: yes
+  tasks:
+    - name: Uninstall rsync and netcat
+      apt:
+        name:
+          - rsync
+          - netcat
+        state: absent
+        purge: yes
+        autoremove: yes
+
+    - name: Supprimer les paquets inutilisés
+      apt:
+        autoremove: yes
+
+    - name: Corriger les problèmes de dépendances
+      command: apt-get -f install
+
+    - name: Purge existing MariaDB packages
+      apt:
+        name:
+          - mariadb-server
+          - galera-3
+          - galera-4
+          - mariadb-common
+        state: absent
+        purge: yes
+        autoremove: yes
